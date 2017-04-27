@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"math/rand"
+	"time"
 )
 
 type memmory [0x1000]byte
@@ -89,7 +90,12 @@ func (c8 *chip8) noop() {
 func (c8 *chip8) Run() {
 
 	for c8.c.r.pc < 0x1000 {
-
+		/*	for i := 0; i < len(c8.c.r.v); i++ {
+				fmt.Printf("V%1X=%x ", i, c8.c.r.v[i])
+			}
+			fmt.Println("")
+		*/
+		time.Sleep(100 * time.Millisecond)
 		cmd := uint16(c8.m[c8.c.r.pc+1]) | uint16(c8.m[c8.c.r.pc])<<8
 		switch cmd & 0xF000 {
 		case 0x0000:
@@ -180,7 +186,7 @@ func (c8 *chip8) Run() {
 				Skip next instruction if Vx = kk.
 				The interpreter compares register Vx to kk, and if they are equal, increments the program counter by 2.
 			*/
-			x := uint8(cmd & (0x0F00 >> 8))
+			x := uint8((cmd & 0x0F00) >> 8)
 			kk := uint8(cmd & 0x00FF)
 			if c8.c.r.v[x] == kk {
 				c8.c.r.pc += 2
@@ -193,9 +199,9 @@ func (c8 *chip8) Run() {
 				Skip next instruction if Vx != kk.
 				The interpreter compares register Vx to kk, and if they are not equal, increments the program counter by 2.
 			*/
-			i := uint8(cmd & 0x0F00 >> 8)
-			b := uint8(cmd & 0x00FF)
-			if c8.c.r.v[i] != b {
+			x := uint8((cmd & 0x0F00) >> 8)
+			kk := uint8(cmd & 0x00FF)
+			if c8.c.r.v[x] != kk {
 				c8.c.r.pc += 2
 			}
 			c8.c.r.pc += 2
@@ -206,9 +212,9 @@ func (c8 *chip8) Run() {
 				  Skip next instruction if Vx = Vy.
 					The interpreter compares register Vx to register Vy, and if they are equal, increments the program counter by 2.
 			*/
-			i := uint8((cmd & 0x0F00) >> 8)
-			b := uint8((cmd & 0x00F0) >> 4)
-			if c8.c.r.v[i] == c8.c.r.v[b] {
+			x := uint8((cmd & 0x0F00) >> 8)
+			y := uint8((cmd & 0x00F0) >> 4)
+			if c8.c.r.v[x] == c8.c.r.v[y] {
 				c8.c.r.pc += 2
 			}
 			c8.c.r.pc += 2
@@ -219,9 +225,9 @@ func (c8 *chip8) Run() {
 				Set Vx = kk.
 				The interpreter puts the value kk into register Vx.
 			*/
-			i := uint8((cmd & 0x0F00) >> 8)
-			b := uint8(cmd & 0x00FF)
-			c8.c.r.v[i] = b
+			x := uint8((cmd & 0x0F00) >> 8)
+			kk := uint8(cmd & 0x00FF)
+			c8.c.r.v[x] = kk
 			c8.c.r.pc += 2
 		case 0x7000:
 			fmt.Printf("%04x %04x\t ADD  V%1X,%02x\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00FF)
@@ -230,9 +236,9 @@ func (c8 *chip8) Run() {
 				Set Vx = Vx + kk.
 				Adds the value kk to the value of register Vx, then stores the result in Vx.
 			*/
-			i := uint8(cmd & 0x0F00 >> 8)
-			b := uint8(cmd & 0x00FF)
-			c8.c.r.v[i] += b
+			x := uint8(cmd & 0x0F00 >> 8)
+			kk := uint8(cmd & 0x00FF)
+			c8.c.r.v[x] += kk
 			c8.c.r.pc += 2
 		case 0x8000:
 			switch cmd & 0x000F {
@@ -243,9 +249,9 @@ func (c8 *chip8) Run() {
 					Set Vx = Vy.
 					Stores the value of register Vy in register Vx
 				*/
-				i := uint8((cmd & 0x0F00) >> 8)
-				b := uint8((cmd & 0x00F0) >> 4)
-				c8.c.r.v[i] = c8.c.r.v[b]
+				x := uint8((cmd & 0x0F00) >> 8)
+				y := uint8((cmd & 0x00F0) >> 4)
+				c8.c.r.v[x] = c8.c.r.v[y]
 				c8.c.r.pc += 2
 			case 1:
 				fmt.Printf("%04x %04x\t OR   V%1X,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
@@ -261,9 +267,9 @@ func (c8 *chip8) Run() {
 							Set Vx = kk.
 							The interpreter puts the value kk into register Vx.
 				*/
-				i := uint8((cmd & 0x0F00) >> 8)
-				b := uint8((cmd & 0x00F0) >> 4)
-				c8.c.r.v[i] |= c8.c.r.v[b]
+				x := uint8((cmd & 0x0F00) >> 8)
+				y := uint8((cmd & 0x00F0) >> 4)
+				c8.c.r.v[x] |= c8.c.r.v[y]
 				c8.c.r.pc += 2
 			case 2:
 				fmt.Printf("%04x %04x\t AND  V%1X,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
@@ -273,9 +279,9 @@ func (c8 *chip8) Run() {
 					Performs a bitwise AND on the values of Vx and Vy,
 					then stores the result in Vx.
 				*/
-				i := uint8((cmd & 0x0F00) >> 8)
-				b := uint8((cmd & 0x00F0) >> 4)
-				c8.c.r.v[i] &= c8.c.r.v[b]
+				x := uint8((cmd & 0x0F00) >> 8)
+				y := uint8((cmd & 0x00F0) >> 4)
+				c8.c.r.v[x] &= c8.c.r.v[y]
 				c8.c.r.pc += 2
 			case 3:
 				fmt.Printf("%04x %04x\t XOR  V%1X,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
@@ -284,9 +290,9 @@ func (c8 *chip8) Run() {
 						Set Vx = Vx XOR Vy.
 						Performs a bitwise exclusive OR on the values of Vx and Vy, then stores the result in Vx.
 				*/
-				i := uint8((cmd & 0x0F00) >> 8)
-				b := uint8((cmd & 0x00F0) >> 4)
-				c8.c.r.v[i] ^= c8.c.r.v[b]
+				x := uint8((cmd & 0x0F00) >> 8)
+				y := uint8((cmd & 0x00F0) >> 4)
+				c8.c.r.v[x] ^= c8.c.r.v[y]
 				c8.c.r.pc += 2
 			case 4:
 				fmt.Printf("%04x %04x\t ADD  V%1X,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
@@ -295,32 +301,31 @@ func (c8 *chip8) Run() {
 					Set Vx = Vx + Vy, set VF = carry.
 					The values of Vx and Vy are added together. If the result is greater than 8 bits (i.e., > 255,) VF is set to 1, otherwise 0. Only the lowest 8 bits of the result are kept, and stored in Vx.
 				*/
-				i := uint8((cmd & 0x0F00) >> 8)
-				b := uint8((cmd & 0x00F0) >> 4)
-				res := uint16(c8.c.r.v[i]) + uint16(c8.c.r.v[b])
+				x := uint8((cmd & 0x0F00) >> 8)
+				y := uint8((cmd & 0x00F0) >> 4)
+				res := uint16(c8.c.r.v[x]) + uint16(c8.c.r.v[y])
 				if res > 255 {
 					c8.c.r.v[0xf] = 1
 				} else {
 					c8.c.r.v[0xf] = 0
 				}
-				c8.c.r.v[i] = uint8(res & 0x00FF)
+				c8.c.r.v[x] = uint8(res & 0x00FF)
 				c8.c.r.pc += 2
 			case 5:
 				fmt.Printf("%04x %04x\t SUB  V%1X,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
 				/*
-						Set Vx = Vx - Vy, set VF = NOT borrow.
-						If Vx > Vy, then VF is set to 1, otherwise 0. Then Vy is subtracted from Vx, and the results stored in Vx.
-
-						i := cmd & 0x0F00
-					  b := cmd & 0x00F0
-						res := uint16(c8.c.r.v[i]) +  uint16(c8.c.r.v[b])
-						if res > 255 {
-							c8.c.r.vf = 1
-						}
-						else{
-							c8.c.r.vf = 0
-						}
-						c8.c.r.v[i] = uint8(res & 0x00FF)*/
+					    8xy5 - SUB Vx, Vy
+							Set Vx = Vx - Vy, set VF = NOT borrow.
+							If Vx > Vy, then VF is set to 1, otherwise 0. Then Vy is subtracted from Vx, and the results stored in Vx.
+				*/
+				x := uint8((cmd & 0x0F00) >> 8)
+				y := uint8((cmd & 0x00F0) >> 4)
+				if c8.c.r.v[x] > c8.c.r.v[y] {
+					c8.c.r.v[0xf] = 1
+				} else {
+					c8.c.r.v[0xf] = 0
+				}
+				c8.c.r.v[x] = c8.c.r.v[x] - c8.c.r.v[y]
 				c8.c.r.pc += 2
 			case 6:
 				fmt.Printf("%04x %04x\t SHR  V%1X,{,V%1X}\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
@@ -342,9 +347,9 @@ func (c8 *chip8) Run() {
 				Skip next instruction if Vx != Vy.
 				The values of Vx and Vy are compared, and if they are not equal, the program counter is increased by 2.
 			*/
-			i := uint8((cmd & 0x0F00) >> 8)
-			b := uint8((cmd & 0x00F0) >> 4)
-			if c8.c.r.v[i] != c8.c.r.v[b] {
+			x := uint8((cmd & 0x0F00) >> 8)
+			y := uint8((cmd & 0x00F0) >> 4)
+			if c8.c.r.v[x] != c8.c.r.v[y] {
 				c8.c.r.pc += 2
 			}
 			c8.c.r.pc += 2
@@ -375,9 +380,9 @@ func (c8 *chip8) Run() {
 				which is then ANDed with the value kk. The results are stored in Vx.
 				See instruction 8xy2 for more information on AND.
 			*/
-			i := uint8((cmd & 0x0F00) >> 8)
-			b := uint8(cmd & 0x00FF)
-			c8.c.r.v[i] = b & uint8(rand.Intn(255))
+			x := uint8((cmd & 0x0F00) >> 8)
+			kk := uint8(cmd & 0x00FF)
+			c8.c.r.v[x] = kk & uint8(rand.Intn(255))
 			c8.c.r.pc += 2
 		case 0xD000:
 			switch cmd & 0x000F {
