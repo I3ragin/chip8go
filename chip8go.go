@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"log"
 	"math/rand"
-	"time"
 )
 
 type memmory [0x1000]byte
@@ -47,6 +46,13 @@ func NewChip8() (c8 *chip8) {
 		0x20, 0x60, 0x20, 0x20, 0x70, //1
 		0xF0, 0x10, 0xF0, 0x80, 0xF0, //2
 		0xF0, 0x10, 0xF0, 0x10, 0xF0, //3
+		0x90, 0x90, 0xF0, 0x10, 0x10, //4
+		0xF0, 0x80, 0xF0, 0x10, 0xF0, //5
+		0xF0, 0x80, 0xF0, 0x90, 0xF0, //6
+		0xF0, 0x10, 0x20, 0x40, 0x40, //7
+		0xF0, 0x90, 0xF0, 0x90, 0xF0, //8
+		0xF0, 0x90, 0xF0, 0x10, 0xF0, //9
+		0xF0, 0x90, 0xF0, 0x90, 0x90, //A
 		0xE0, 0x90, 0xE0, 0x90, 0xE0, //B
 		0xF0, 0x80, 0x80, 0x80, 0xF0, //C
 		0xE0, 0x90, 0x90, 0x90, 0xE0, //D
@@ -63,10 +69,34 @@ func NewChip8() (c8 *chip8) {
 }
 
 func (c8 *chip8) cls() {
+	fmt.Print("\033[H\033[J")
+	//"\033[2J\033[H"
 	//display.clear()
 }
 
 func (c8 *chip8) drw(x, y, n uint8) {
+	//define gotoxy(x,y) printf("\033[%d;%dH", (x), (y))
+	x = 90
+	y = 10
+	n = 40
+	c8.c.r.i = 0
+	c8.c.r.v[0xf] = 0
+	for i := uint16(0); i < uint16(n); i++ {
+		b := c8.m[c8.c.r.i+i]
+
+		for n := uint(0); n < 8; n++ {
+			//fmt.Printf("%d", (b>>n)&0x01)
+
+			if ((b >> (8 - n)) & 0x01) > 0 {
+				fmt.Printf("\033[%d;%dH#", y+uint8(i), x+uint8(n))
+			} else {
+				fmt.Printf("\033[%d;%dH ", y+uint8(i), x+uint8(n))
+			}
+
+		}
+		fmt.Println("")
+	}
+
 	//display.draw_sprite()
 }
 
@@ -91,29 +121,30 @@ func (c8 *chip8) Run() {
 
 	for c8.c.r.pc < 0x1000 {
 		/*	for i := 0; i < len(c8.c.r.v); i++ {
-				fmt.Printf("V%1X=%x ", i, c8.c.r.v[i])
+				//fmt.Printf("V%1X=%x ", i, c8.c.r.v[i])
 			}
-			fmt.Println("")
+			//fmt.Println("")
 		*/
-		time.Sleep(100 * time.Millisecond)
+		//time.Sleep(10 * time.Millisecond)
 		cmd := uint16(c8.m[c8.c.r.pc+1]) | uint16(c8.m[c8.c.r.pc])<<8
 		switch cmd & 0xF000 {
 		case 0x0000:
 			switch cmd & 0x00FF {
 			case 0x10:
-				fmt.Printf("%04x %04x\t MEGAOFF\n", c8.c.r.pc, cmd)
+				//fmt.Printf("%04x %04x\t MEGAOFF\n", c8.c.r.pc, cmd)
 				c8.noop()
 				c8.c.r.pc += 2
 			case 0x11:
-				fmt.Printf("%04x %04x\t MEGAON\n", c8.c.r.pc, cmd)
+				//fmt.Printf("%04x %04x\t MEGAON\n", c8.c.r.pc, cmd)
 				c8.c.r.pc += 2
 			case 0xE0:
-				fmt.Printf("%04x %04x\t CLS\n", c8.c.r.pc, cmd)
+				//fmt.Printf("%04x %04x\t CLS\n", c8.c.r.pc, cmd)
 				//00E0 - CLS
 				//Clear the display
+				c8.cls()
 				c8.c.r.pc += 2
 			case 0xEE:
-				fmt.Printf("%04x %04x\t RET\n", c8.c.r.pc, cmd)
+				//fmt.Printf("%04x %04x\t RET\n", c8.c.r.pc, cmd)
 				/*00EE - RET
 				  Return from a subroutine.
 				  The interpreter sets the program counter to the address at the top of the stack, then subtracts 1 from the stack pointer.
@@ -127,27 +158,27 @@ func (c8 *chip8) Run() {
 
 				c8.c.r.pc += 2
 			case 0xFB:
-				fmt.Printf("%04x %04x\t SCR\n", c8.c.r.pc, cmd)
+				//fmt.Printf("%04x %04x\t SCR\n", c8.c.r.pc, cmd)
 				c8.c.r.pc += 2
 			case 0xFC:
-				fmt.Printf("%04x %04x\t SCL\n", c8.c.r.pc, cmd)
+				//fmt.Printf("%04x %04x\t SCL\n", c8.c.r.pc, cmd)
 				c8.c.r.pc += 2
 			case 0xFD:
-				fmt.Printf("%04x %04x\t EXIT\n", c8.c.r.pc, cmd)
+				//fmt.Printf("%04x %04x\t EXIT\n", c8.c.r.pc, cmd)
 				c8.c.r.pc += 2
 			case 0xFE:
-				fmt.Printf("%04x %04x\t LOW\n", c8.c.r.pc, cmd)
+				//fmt.Printf("%04x %04x\t LOW\n", c8.c.r.pc, cmd)
 				c8.c.r.pc += 2
 			case 0xFF:
-				fmt.Printf("%04x %04x\t HIGH\n", c8.c.r.pc, cmd)
+				//fmt.Printf("%04x %04x\t HIGH\n", c8.c.r.pc, cmd)
 				c8.c.r.pc += 2
 			default:
 				switch cmd & 0x00F0 {
 				case 0xC0:
-					fmt.Printf("%04x %04x\t SCD  %1x\n", c8.c.r.pc, cmd, cmd&0x000F)
+					//fmt.Printf("%04x %04x\t SCD  %1x\n", c8.c.r.pc, cmd, cmd&0x000F)
 					c8.c.r.pc += 2
 				default:
-					fmt.Printf("%04x %04x\t SYS  %03x\n", c8.c.r.pc, cmd, cmd&0x0FFF)
+					//fmt.Printf("%04x %04x\t SYS  %03x\n", c8.c.r.pc, cmd, cmd&0x0FFF)
 					/*
 											  0nnn -  SYS addr
 											  Jump to a machine code routine at nnn.
@@ -159,7 +190,7 @@ func (c8 *chip8) Run() {
 			}
 			//HERE MEGA CHIP OPTCODE 02NN 03NN 04NN 05NN 06NN 07NN 08NN
 		case 0x1000:
-			fmt.Printf("%04x %04x\t JP   %03x\n", c8.c.r.pc, cmd, cmd&0x0FFF)
+			//fmt.Printf("%04x %04x\t JP   %03x\n", c8.c.r.pc, cmd, cmd&0x0FFF)
 			/*
 							  1nnn - JP addr
 				        Jump to location nnn.
@@ -167,7 +198,7 @@ func (c8 *chip8) Run() {
 			*/
 			c8.c.r.pc = cmd & 0x0FFF
 		case 0x2000:
-			fmt.Printf("%04x %04x\t CALL %03x\n", c8.c.r.pc, cmd, cmd&0x0FFF)
+			//fmt.Printf("%04x %04x\t CALL %03x\n", c8.c.r.pc, cmd, cmd&0x0FFF)
 			/*
 				2nnn - CALL addr
 				Call subroutine at nnn.
@@ -180,7 +211,7 @@ func (c8 *chip8) Run() {
 			}
 
 		case 0x3000:
-			fmt.Printf("%04x %04x\t SE   V%1X,%02x\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00FF)
+			//fmt.Printf("%04x %04x\t SE   V%1X,%02x\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00FF)
 			/*
 				3xkk - SE Vx, byte
 				Skip next instruction if Vx = kk.
@@ -193,7 +224,7 @@ func (c8 *chip8) Run() {
 			}
 			c8.c.r.pc += 2
 		case 0x4000:
-			fmt.Printf("%04x %04x\t SNE  V%1X,%02x\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00FF)
+			//fmt.Printf("%04x %04x\t SNE  V%1X,%02x\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00FF)
 			/*
 				4xkk - SNE Vx, byte
 				Skip next instruction if Vx != kk.
@@ -206,7 +237,7 @@ func (c8 *chip8) Run() {
 			}
 			c8.c.r.pc += 2
 		case 0x5000:
-			fmt.Printf("%04x %04x\t SE   V%1X,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
+			//fmt.Printf("%04x %04x\t SE   V%1X,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
 			/*
 					5xy0 - SE Vx, Vy
 				  Skip next instruction if Vx = Vy.
@@ -219,7 +250,7 @@ func (c8 *chip8) Run() {
 			}
 			c8.c.r.pc += 2
 		case 0x6000:
-			fmt.Printf("%04x %04x\t LD   V%1X,%02x\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00FF)
+			//fmt.Printf("%04x %04x\t LD   V%1X,%02x\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00FF)
 			/*
 				6xkk - LD Vx, byte
 				Set Vx = kk.
@@ -230,7 +261,7 @@ func (c8 *chip8) Run() {
 			c8.c.r.v[x] = kk
 			c8.c.r.pc += 2
 		case 0x7000:
-			fmt.Printf("%04x %04x\t ADD  V%1X,%02x\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00FF)
+			//fmt.Printf("%04x %04x\t ADD  V%1X,%02x\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00FF)
 			/*
 				7xkk - ADD Vx, byte
 				Set Vx = Vx + kk.
@@ -243,7 +274,7 @@ func (c8 *chip8) Run() {
 		case 0x8000:
 			switch cmd & 0x000F {
 			case 0:
-				fmt.Printf("%04x %04x\t LD   V%1X,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
+				//fmt.Printf("%04x %04x\t LD   V%1X,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
 				/*
 					8xy0 - LD Vx, Vy
 					Set Vx = Vy.
@@ -254,14 +285,14 @@ func (c8 *chip8) Run() {
 				c8.c.r.v[x] = c8.c.r.v[y]
 				c8.c.r.pc += 2
 			case 1:
-				fmt.Printf("%04x %04x\t OR   V%1X,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
+				//fmt.Printf("%04x %04x\t OR   V%1X,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
 				/*
 								8xy1 - OR Vx, Vy
 								Set Vx = Vx OR Vy.
 								Performs a bitwise OR on the values of Vx and Vy, then stores the result
 								in Vx.
 					case 0x6000:
-						fmt.Printf("%04x %04x\t LD   V%1X,%02x\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00FF)
+						//fmt.Printf("%04x %04x\t LD   V%1X,%02x\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00FF)
 						/*
 							6xkk - LD Vx, byte
 							Set Vx = kk.
@@ -272,7 +303,7 @@ func (c8 *chip8) Run() {
 				c8.c.r.v[x] |= c8.c.r.v[y]
 				c8.c.r.pc += 2
 			case 2:
-				fmt.Printf("%04x %04x\t AND  V%1X,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
+				//fmt.Printf("%04x %04x\t AND  V%1X,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
 				/*
 					8xy2 - AND Vx, Vy
 					Set Vx = Vx AND Vy.
@@ -284,7 +315,7 @@ func (c8 *chip8) Run() {
 				c8.c.r.v[x] &= c8.c.r.v[y]
 				c8.c.r.pc += 2
 			case 3:
-				fmt.Printf("%04x %04x\t XOR  V%1X,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
+				//fmt.Printf("%04x %04x\t XOR  V%1X,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
 				/*
 					  8xy3 - XOR Vx, Vy
 						Set Vx = Vx XOR Vy.
@@ -295,7 +326,7 @@ func (c8 *chip8) Run() {
 				c8.c.r.v[x] ^= c8.c.r.v[y]
 				c8.c.r.pc += 2
 			case 4:
-				fmt.Printf("%04x %04x\t ADD  V%1X,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
+				//fmt.Printf("%04x %04x\t ADD  V%1X,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
 				/*
 					8xy4 - ADD Vx, Vy
 					Set Vx = Vx + Vy, set VF = carry.
@@ -312,7 +343,7 @@ func (c8 *chip8) Run() {
 				c8.c.r.v[x] = uint8(res & 0x00FF)
 				c8.c.r.pc += 2
 			case 5:
-				fmt.Printf("%04x %04x\t SUB  V%1X,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
+				//fmt.Printf("%04x %04x\t SUB  V%1X,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
 				/*
 					    8xy5 - SUB Vx, Vy
 							Set Vx = Vx - Vy, set VF = NOT borrow.
@@ -328,20 +359,20 @@ func (c8 *chip8) Run() {
 				c8.c.r.v[x] = c8.c.r.v[x] - c8.c.r.v[y]
 				c8.c.r.pc += 2
 			case 6:
-				fmt.Printf("%04x %04x\t SHR  V%1X,{,V%1X}\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
+				//fmt.Printf("%04x %04x\t SHR  V%1X,{,V%1X}\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
 				c8.c.r.pc += 2
 			case 7:
-				fmt.Printf("%04x %04x\t SUBN V%1X,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
+				//fmt.Printf("%04x %04x\t SUBN V%1X,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
 				c8.c.r.pc += 2
 			case 0xE:
-				fmt.Printf("%04x %04x\t SHL  V%1X,{,V%1X}\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
+				//fmt.Printf("%04x %04x\t SHL  V%1X,{,V%1X}\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
 				c8.c.r.pc += 2
 			default:
-				fmt.Printf("%04x %04x\t ERROR\n", c8.c.r.pc, cmd)
+				//fmt.Printf("%04x %04x\t ERROR\n", c8.c.r.pc, cmd)
 				c8.c.r.pc += 2
 			}
 		case 0x9000:
-			fmt.Printf("%04x %04x\t SNE  V%1X,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
+			//fmt.Printf("%04x %04x\t SNE  V%1X,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
 			/*
 				9xy0 - SNE Vx, Vy
 				Skip next instruction if Vx != Vy.
@@ -355,7 +386,7 @@ func (c8 *chip8) Run() {
 			c8.c.r.pc += 2
 
 		case 0xA000:
-			fmt.Printf("%04x %04x\t LD   I, %03x\n", c8.c.r.pc, cmd, cmd&0x0FFF)
+			//fmt.Printf("%04x %04x\t LD   I, %03x\n", c8.c.r.pc, cmd, cmd&0x0FFF)
 			/*
 				Annn - LD I, addr
 				Set I = nnn.
@@ -364,7 +395,7 @@ func (c8 *chip8) Run() {
 			c8.c.r.i = cmd & 0x0FFF
 			c8.c.r.pc += 2
 		case 0xB000:
-			fmt.Printf("%04x %04x\t JP   V0, %03x\n", c8.c.r.pc, cmd, cmd&0x0FFF)
+			//fmt.Printf("%04x %04x\t JP   V0, %03x\n", c8.c.r.pc, cmd, cmd&0x0FFF)
 			/*
 				Bnnn - JP V0, addr
 				Jump to location nnn + V0.
@@ -372,7 +403,7 @@ func (c8 *chip8) Run() {
 			*/
 			c8.c.r.pc = uint16(c8.c.r.v[0]) + uint16(cmd&0x0FFF)
 		case 0xC000:
-			fmt.Printf("%04x %04x\t RND  V%1X,%02x\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00FF)
+			//fmt.Printf("%04x %04x\t RND  V%1X,%02x\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00FF)
 			/*
 				Cxkk - RND Vx, byte
 				Set Vx = random byte AND kk.
@@ -387,7 +418,7 @@ func (c8 *chip8) Run() {
 		case 0xD000:
 			switch cmd & 0x000F {
 			case 0:
-				fmt.Printf("%04x %04x\t DRW  V%1X, V%1X, 0\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
+				//fmt.Printf("%04x %04x\t DRW  V%1X, V%1X, 0\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
 				x := uint8((cmd & 0x0F00) >> 8)
 				y := uint8((cmd & 0x00F0) >> 4)
 				c8.drw(x, y, 0)
@@ -406,7 +437,7 @@ func (c8 *chip8) Run() {
 					and section 2.4, Display, for more information on the Chip-8 screen and
 					sprites.
 				*/
-				fmt.Printf("%04x %04x\t DRW  V%1X, V%1X, %1x\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4, cmd&0x000F)
+				//fmt.Printf("%04x %04x\t DRW  V%1X, V%1X, %1x\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4, cmd&0x000F)
 
 				x := uint8((cmd & 0x0F00) >> 8)
 				y := uint8((cmd & 0x00F0) >> 4)
@@ -419,19 +450,19 @@ func (c8 *chip8) Run() {
 		case 0xE000:
 			switch cmd & 0x00FF {
 			case 0x9E:
-				fmt.Printf("%04x %04x\t SKP  V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
+				//fmt.Printf("%04x %04x\t SKP  V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
 				c8.c.r.pc += 2
 			case 0xA1:
-				fmt.Printf("%04x %04x\t SKNP V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
+				//fmt.Printf("%04x %04x\t SKNP V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
 				c8.c.r.pc += 2
 			default:
-				fmt.Printf("%04x %04x\t ERROR\n", c8.c.r.pc, cmd)
+				//fmt.Printf("%04x %04x\t ERROR\n", c8.c.r.pc, cmd)
 				c8.c.r.pc += 2
 			}
 		case 0xF000:
 			switch cmd & 0x00FF {
 			case 0x07:
-				fmt.Printf("%04x %04x\t LD   V%1X,DT\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
+				//fmt.Printf("%04x %04x\t LD   V%1X,DT\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
 				/*
 					Fx07 - LD Vx, DT
 					Set Vx = delay timer value.
@@ -441,45 +472,45 @@ func (c8 *chip8) Run() {
 				//c8.c.r.dt = c8.c.r.v[x]
 				c8.c.r.pc += 2
 			case 0x0A:
-				fmt.Printf("%04x %04x\t LD   V%1X,K\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
+				//fmt.Printf("%04x %04x\t LD   V%1X,K\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
 				c8.c.r.pc += 2
 			case 0x15:
-				fmt.Printf("%04x %04x\t LD   DT,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
+				//fmt.Printf("%04x %04x\t LD   DT,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
 				c8.c.r.pc += 2
 			case 0x18:
-				fmt.Printf("%04x %04x\t LD   ST,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
+				//fmt.Printf("%04x %04x\t LD   ST,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
 				c8.c.r.pc += 2
 			case 0x1E:
-				fmt.Printf("%04x %04x\t ADD  I,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
+				//fmt.Printf("%04x %04x\t ADD  I,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
 				c8.c.r.pc += 2
 			case 0x29:
-				fmt.Printf("%04x %04x\t LD   I,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
+				//fmt.Printf("%04x %04x\t LD   I,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
 				c8.c.r.pc += 2
 			case 0x30:
-				fmt.Printf("%04x %04x\t LD   HF,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
+				//fmt.Printf("%04x %04x\t LD   HF,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
 				c8.c.r.pc += 2
 			case 0x33:
-				fmt.Printf("%04x %04x\t LD   B,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
+				//fmt.Printf("%04x %04x\t LD   B,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
 				c8.c.r.pc += 2
 			case 0x55:
-				fmt.Printf("%04x %04x\t LD   [I],V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
+				//fmt.Printf("%04x %04x\t LD   [I],V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
 				c8.c.r.pc += 2
 			case 0x65:
-				fmt.Printf("%04x %04x\t LD   V%1X,[I]\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
+				//fmt.Printf("%04x %04x\t LD   V%1X,[I]\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
 				c8.c.r.pc += 2
 			case 0x75:
-				fmt.Printf("%04x %04x\t LD   R,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
+				//fmt.Printf("%04x %04x\t LD   R,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
 				c8.c.r.pc += 2
 			case 0x85:
-				fmt.Printf("%04x %04x\t LD   V%1X,R\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
+				//fmt.Printf("%04x %04x\t LD   V%1X,R\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
 				c8.c.r.pc += 2
 
 			default:
-				fmt.Printf("%04x %04x\t ERROR\n", c8.c.r.pc, cmd)
+				//fmt.Printf("%04x %04x\t ERROR\n", c8.c.r.pc, cmd)
 				c8.c.r.pc += 2
 			}
 		default:
-			fmt.Printf("%04x %04x\n", c8.c.r.pc, cmd)
+			//fmt.Printf("%04x %04x\n", c8.c.r.pc, cmd)
 			c8.c.r.pc += 2
 		}
 	}
