@@ -2,15 +2,92 @@ package main
 
 import (
 	"fmt"
+	"github.com/veandco/go-sdl2/sdl"
 	"io/ioutil"
 	"log"
 	"math/rand"
+	"os"
+	"time"
+	"unsafe"
 )
 
+const PixOn, PixOff uint32 = 0x00EEEECC, 0
+
+var vmem [64 * 32]uint32
+
+type Display struct {
+	winTitle  string
+	winWidth  int
+	winHeight int
+	window    *sdl.Window
+	renderer  *sdl.Renderer
+	texture   *sdl.Texture
+	//	vmem      [64 * 32]uint32
+	src sdl.Rect
+	dst sdl.Rect
+}
+
+func NewDisplay() (d *Display, err error) {
+	d = &Display{
+		winTitle:  "chip8",
+		winWidth:  960,
+		winHeight: 480,
+		src:       sdl.Rect{0, 0, 640, 320},
+		dst:       sdl.Rect{160, 80, 640, 320},
+	}
+
+	d.window, err = sdl.CreateWindow(d.winTitle, sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, d.winWidth, d.winHeight, sdl.WINDOW_SHOWN)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to create window: %s\n", err)
+		return nil, err
+	}
+
+	d.renderer, err = sdl.CreateRenderer(d.window, -1, sdl.RENDERER_ACCELERATED)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to create renderer: %s\n", err)
+		return nil, err
+	}
+
+	d.texture, err = d.renderer.CreateTexture(sdl.PIXELFORMAT_ARGB8888, sdl.TEXTUREACCESS_STATIC, 64, 32)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to create texture: %s\n", err)
+		return nil, err
+	}
+
+	return d, nil
+}
+
+func (d *Display) Update(pixels unsafe.Pointer) {
+	d.renderer.Clear()
+	d.texture.Update(nil, pixels, 64*4)
+	d.renderer.Copy(d.texture, &d.src, &d.dst)
+	d.renderer.Present()
+}
+
+func (d *Display) Clear() {
+	d.renderer.Clear()
+	d.renderer.Present()
+}
+
+func (d *Display) Destroy() {
+	defer d.window.Destroy()
+	defer d.renderer.Destroy()
+	defer d.texture.Destroy()
+}
+
 type memmory [0x1000]byte
+type keyboard [0x10]byte
 type stack struct {
 	mem     [16]uint16
 	pointer uint8
+}
+
+func (s *stack) push() {
+
+}
+
+func (s *stack) pop() {
+
 }
 
 //CHIP-8 was most commonly implemented on 4K systems, such as the Cosmac VIP and the Telmac 1800. These machines had 4096 (0x1000) memory locations, all of which are 8 bits (a byte) which is where the term CHIP-8 originated. However, the CHIP-8 interpreter itself occupies the first 512 bytes of the memory space on these machines. For this reason, most programs written for the original system begin at memory location 512 (0x200) and do not access any of the memory below the location 512 (0x200). The uppermost 256 bytes (0xF00-0xFFF) are reserved for display refresh, and the 96 bytes below that (0xEA0-0xEFF) were reserved for call stack, internal use, and other variables.
@@ -20,8 +97,8 @@ type registers struct {
 	i  uint16 //The Index Register
 	pc uint16 //Program Counter
 	sp uint8  //The Stack Pointer
-	st timer  // the sound timer register
-	dt timer  // the delay timer register
+	st uint8  // the sound timer register
+	dt uint8  // the delay timer register
 
 }
 
@@ -32,11 +109,22 @@ type cpu struct {
 type timer struct {
 }
 
+/*
+type display interface {
+    bitmap [64*32]bool
+}
+func (c8 *chip8) drw(x, y, n uint8) {
+
+}
+*/
+
 //CHIP8  ...
 type chip8 struct {
 	c cpu
 	m memmory
 	s stack
+	k keyboard
+	d *Display
 }
 
 func NewChip8() (c8 *chip8) {
@@ -65,39 +153,44 @@ func NewChip8() (c8 *chip8) {
 	c8.c.r.pc = 0x200
 	c8.c.r.i = 0x200
 	c8.s.pointer = 0
+
+	c8.d, _ = NewDisplay()
+
 	return c8
 }
 
 func (c8 *chip8) cls() {
 	fmt.Print("\033[H\033[J")
+	c8.d.Clear()
 	//"\033[2J\033[H"
 	//display.clear()
 }
 
 func (c8 *chip8) drw(x, y, n uint8) {
-	//define gotoxy(x,y) printf("\033[%d;%dH", (x), (y))
-	x = 90
-	y = 10
-	n = 40
-	c8.c.r.i = 0
+	/*x = 30
+	y = 2
+	n = 30
+	c8.c.r.i = 0*/
 	c8.c.r.v[0xf] = 0
-	for i := uint16(0); i < uint16(n); i++ {
-		b := c8.m[c8.c.r.i+i]
+	for dy := uint16(0); dy < uint16(n); dy++ {
 
-		for n := uint(0); n < 8; n++ {
-			//fmt.Printf("%d", (b>>n)&0x01)
+		b := c8.m[c8.c.r.i+dy]
 
-			if ((b >> (8 - n)) & 0x01) > 0 {
-				fmt.Printf("\033[%d;%dH#", y+uint8(i), x+uint8(n))
+		for dx := uint(0); dx < 8; dx++ {
+
+			if ((b >> (8 - dx)) & 0x01) > 0 {
+				//fmt.Printf("\033[%d;%dH#", y+uint8(dy), x+uint8(dx))
+				vmem[uint32(x+uint8(dx))+uint32(y+uint8(dy))*64] = PixOn
+
 			} else {
-				fmt.Printf("\033[%d;%dH ", y+uint8(i), x+uint8(n))
+				//vmem[(x+uint8(i))*(y+uint8(n))] = PixOff
+				vmem[uint32(x+uint8(dx))+uint32(y+uint8(dy))*64] = PixOff
+				//fmt.Printf("\033[%d;%dH ", y+uint8(i), x+uint8(n))
 			}
-
 		}
-		fmt.Println("")
 	}
+	c8.d.Update(unsafe.Pointer(&vmem))
 
-	//display.draw_sprite()
 }
 
 func (c8 *chip8) Load(frimware string) error {
@@ -117,14 +210,22 @@ func (c8 *chip8) Load(frimware string) error {
 func (c8 *chip8) noop() {
 }
 
+func (c8 *chip8) timer() {
+	if c8.c.r.st > 0 {
+		c8.c.r.st--
+		//beep()
+	}
+	if c8.c.r.dt > 0 {
+		c8.c.r.dt--
+	}
+	//60Hz
+	time.Sleep(16666 * time.Microsecond)
+}
+
 func (c8 *chip8) Run() {
+	go c8.timer()
 
 	for c8.c.r.pc < 0x1000 {
-		/*	for i := 0; i < len(c8.c.r.v); i++ {
-				//fmt.Printf("V%1X=%x ", i, c8.c.r.v[i])
-			}
-			//fmt.Println("")
-		*/
 		//time.Sleep(10 * time.Millisecond)
 		cmd := uint16(c8.m[c8.c.r.pc+1]) | uint16(c8.m[c8.c.r.pc])<<8
 		switch cmd & 0xF000 {
@@ -136,6 +237,7 @@ func (c8 *chip8) Run() {
 				c8.c.r.pc += 2
 			case 0x11:
 				//fmt.Printf("%04x %04x\t MEGAON\n", c8.c.r.pc, cmd)
+				c8.noop()
 				c8.c.r.pc += 2
 			case 0xE0:
 				//fmt.Printf("%04x %04x\t CLS\n", c8.c.r.pc, cmd)
@@ -153,29 +255,33 @@ func (c8 *chip8) Run() {
 				if c8.s.pointer >= 0 {
 					c8.s.pointer -= 1
 					c8.c.r.pc = c8.s.mem[c8.s.pointer]
-					//c8.c.r.pc = cmd & 0x0FFF
 				}
 
 				c8.c.r.pc += 2
 			case 0xFB:
 				//fmt.Printf("%04x %04x\t SCR\n", c8.c.r.pc, cmd)
+				//Super Chip-48 Instructions
 				c8.c.r.pc += 2
 			case 0xFC:
 				//fmt.Printf("%04x %04x\t SCL\n", c8.c.r.pc, cmd)
+				//Super Chip-48 Instructions
 				c8.c.r.pc += 2
 			case 0xFD:
 				//fmt.Printf("%04x %04x\t EXIT\n", c8.c.r.pc, cmd)
+				//Super Chip-48 Instructions
 				c8.c.r.pc += 2
 			case 0xFE:
 				//fmt.Printf("%04x %04x\t LOW\n", c8.c.r.pc, cmd)
 				c8.c.r.pc += 2
 			case 0xFF:
 				//fmt.Printf("%04x %04x\t HIGH\n", c8.c.r.pc, cmd)
+				//Super Chip-48 Instructions
 				c8.c.r.pc += 2
 			default:
 				switch cmd & 0x00F0 {
 				case 0xC0:
 					//fmt.Printf("%04x %04x\t SCD  %1x\n", c8.c.r.pc, cmd, cmd&0x000F)
+					//Super Chip-48 Instructions
 					c8.c.r.pc += 2
 				default:
 					//fmt.Printf("%04x %04x\t SYS  %03x\n", c8.c.r.pc, cmd, cmd&0x0FFF)
@@ -184,6 +290,7 @@ func (c8 *chip8) Run() {
 											  Jump to a machine code routine at nnn.
 						            This instruction is only used on the old computers on which Chip-8 was originally implemented. It is ignored by modern interpreters.
 					*/
+					c8.noop()
 					c8.c.r.pc += 2
 				}
 
@@ -287,16 +394,10 @@ func (c8 *chip8) Run() {
 			case 1:
 				//fmt.Printf("%04x %04x\t OR   V%1X,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
 				/*
-								8xy1 - OR Vx, Vy
-								Set Vx = Vx OR Vy.
-								Performs a bitwise OR on the values of Vx and Vy, then stores the result
-								in Vx.
-					case 0x6000:
-						//fmt.Printf("%04x %04x\t LD   V%1X,%02x\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00FF)
-						/*
-							6xkk - LD Vx, byte
-							Set Vx = kk.
-							The interpreter puts the value kk into register Vx.
+					8xy1 - OR Vx, Vy
+					Set Vx = Vx OR Vy.
+					Performs a bitwise OR on the values of Vx and Vy, then stores the result
+					in Vx.
 				*/
 				x := uint8((cmd & 0x0F00) >> 8)
 				y := uint8((cmd & 0x00F0) >> 4)
@@ -330,7 +431,10 @@ func (c8 *chip8) Run() {
 				/*
 					8xy4 - ADD Vx, Vy
 					Set Vx = Vx + Vy, set VF = carry.
-					The values of Vx and Vy are added together. If the result is greater than 8 bits (i.e., > 255,) VF is set to 1, otherwise 0. Only the lowest 8 bits of the result are kept, and stored in Vx.
+					The values of Vx and Vy are added together.
+					If the result is greater than 8 bits (i.e., > 255,) VF is set to 1,
+					otherwise 0. Only the lowest 8 bits of the result are kept,
+					and stored in Vx.
 				*/
 				x := uint8((cmd & 0x0F00) >> 8)
 				y := uint8((cmd & 0x00F0) >> 4)
@@ -347,7 +451,8 @@ func (c8 *chip8) Run() {
 				/*
 					    8xy5 - SUB Vx, Vy
 							Set Vx = Vx - Vy, set VF = NOT borrow.
-							If Vx > Vy, then VF is set to 1, otherwise 0. Then Vy is subtracted from Vx, and the results stored in Vx.
+							If Vx > Vy, then VF is set to 1, otherwise 0.
+							Then Vy is subtracted from Vx, and the results stored in Vx.
 				*/
 				x := uint8((cmd & 0x0F00) >> 8)
 				y := uint8((cmd & 0x00F0) >> 4)
@@ -360,12 +465,43 @@ func (c8 *chip8) Run() {
 				c8.c.r.pc += 2
 			case 6:
 				//fmt.Printf("%04x %04x\t SHR  V%1X,{,V%1X}\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
+				/*
+					8xy6 - SHR Vx {, Vy}
+					Set Vx = Vx SHR 1.
+					If the least-significant bit of Vx is 1, then VF is set to 1,
+					otherwise 0. Then Vx is divided by 2.
+				*/
+				x := uint8((cmd & 0x0F00) >> 8)
+				c8.c.r.v[0xf] &= 0x01
+				c8.c.r.v[x] = c8.c.r.v[x] >> 1
 				c8.c.r.pc += 2
 			case 7:
 				//fmt.Printf("%04x %04x\t SUBN V%1X,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
+				/*
+					Set Vx = Vy - Vx, set VF = NOT borrow.
+					If Vy > Vx, then VF is set to 1, otherwise 0.
+					Then Vx is subtracted from Vy, and the results stored in Vx.
+				*/
+				x := uint8((cmd & 0x0F00) >> 8)
+				y := uint8((cmd & 0x00F0) >> 4)
+				if c8.c.r.v[y] > c8.c.r.v[x] {
+					c8.c.r.v[0xf] = 1
+				} else {
+					c8.c.r.v[0xf] = 0
+				}
+				c8.c.r.v[x] = c8.c.r.v[x] - c8.c.r.v[y]
 				c8.c.r.pc += 2
 			case 0xE:
 				//fmt.Printf("%04x %04x\t SHL  V%1X,{,V%1X}\n", c8.c.r.pc, cmd, cmd&0x0F00>>8, cmd&0x00F0>>4)
+				/*
+									8xyE - SHL Vx {, Vy}
+									Set Vx = Vx SHL 1.
+					        If the most-significant bit of Vx is 1, then VF is set to 1,
+									otherwise to 0. Then Vx is multiplied by 2.
+				*/
+				x := uint8((cmd & 0x0F00) >> 8)
+				c8.c.r.v[0xf] &= 0x01
+				c8.c.r.v[x] = c8.c.r.v[x] << 1
 				c8.c.r.pc += 2
 			default:
 				//fmt.Printf("%04x %04x\t ERROR\n", c8.c.r.pc, cmd)
@@ -451,9 +587,32 @@ func (c8 *chip8) Run() {
 			switch cmd & 0x00FF {
 			case 0x9E:
 				//fmt.Printf("%04x %04x\t SKP  V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
+				/*
+					Ex9E - SKP Vx
+					Skip next instruction if key with the value of Vx is pressed.
+					Checks the keyboard, and if the key corresponding to the value of Vx
+					is currently in the down position, PC is increased by 2.
+				*/
+				x := uint8((cmd & 0x0F00) >> 8)
+				k := c8.c.r.v[x]
+				if c8.k[k] == 1 {
+					c8.c.r.pc += 2
+				}
+
 				c8.c.r.pc += 2
 			case 0xA1:
 				//fmt.Printf("%04x %04x\t SKNP V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
+				/*
+					Skip next instruction if key with the value of Vx is not pressed.
+					Checks the keyboard, and if the key corresponding to the value of Vx
+					is currently in the up position, PC is increased by 2.
+				*/
+				x := uint8((cmd & 0x0F00) >> 8)
+				k := c8.c.r.v[x]
+				if c8.k[k] != 1 {
+					c8.c.r.pc += 2
+				}
+
 				c8.c.r.pc += 2
 			default:
 				//fmt.Printf("%04x %04x\t ERROR\n", c8.c.r.pc, cmd)
@@ -468,23 +627,61 @@ func (c8 *chip8) Run() {
 					Set Vx = delay timer value.
 					The value of DT is placed into Vx.
 				*/
-				//x := uint8((cmd & 0x0F00) >> 8)
-				//c8.c.r.dt = c8.c.r.v[x]
+				x := uint8((cmd & 0x0F00) >> 8)
+				c8.c.r.v[x] = c8.c.r.dt
 				c8.c.r.pc += 2
 			case 0x0A:
 				//fmt.Printf("%04x %04x\t LD   V%1X,K\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
+				/*
+					Fx0A - LD Vx, K
+					Wait for a key press, store the value of the key in Vx.
+					All execution stops until a key is pressed,
+					then the value of that key is stored in Vx.
+				*/
+				//!!!!!!
+				//c8.k[]
 				c8.c.r.pc += 2
 			case 0x15:
+				/*
+					Fx15 - LD DT, Vx
+					Set delay timer = Vx.
+
+					DT is set equal to the value of Vx.
+				*/
+				x := uint8((cmd & 0x0F00) >> 8)
+				c8.c.r.dt = c8.c.r.v[x]
 				//fmt.Printf("%04x %04x\t LD   DT,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
 				c8.c.r.pc += 2
 			case 0x18:
+				/*
+					Fx18 - LD ST, Vx
+					Set sound timer = Vx.
+					ST is set equal to the value of Vx.
+				*/
+				x := uint8((cmd & 0x0F00) >> 8)
+				c8.c.r.st = c8.c.r.v[x]
 				//fmt.Printf("%04x %04x\t LD   ST,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
 				c8.c.r.pc += 2
 			case 0x1E:
+				/*
+					Fx1E - ADD I, Vx
+					Set I = I + Vx.
+					The values of I and Vx are added, and the results are stored in I.
+				*/
+				x := uint8((cmd & 0x0F00) >> 8)
+				c8.c.r.i += uint16(c8.c.r.v[x])
 				//fmt.Printf("%04x %04x\t ADD  I,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
 				c8.c.r.pc += 2
 			case 0x29:
 				//fmt.Printf("%04x %04x\t LD   I,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
+				/*
+					Fx29 - LD F, Vx
+					Set I = location of sprite for digit Vx.
+					The value of I is set to the location for the hexadecimal sprite corresponding
+					to the value of Vx. See section 2.4, Display, for more information on the Chip-8 hexadecimal font
+				*/
+				x := uint8((cmd & 0x0F00) >> 8)
+				c8.c.r.i = uint16(c8.c.r.v[x]) * 5
 				c8.c.r.pc += 2
 			case 0x30:
 				//fmt.Printf("%04x %04x\t LD   HF,V%1X\n", c8.c.r.pc, cmd, cmd&0x0F00>>8)
