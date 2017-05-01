@@ -36,6 +36,8 @@ func NewDisplay() (d *Display, err error) {
 		dst:       sdl.Rect{160, 80, 640, 320},
 	}
 
+
+
 	d.window, err = sdl.CreateWindow(d.winTitle, sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, d.winWidth, d.winHeight, sdl.WINDOW_SHOWN)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create window: %s\n", err)
@@ -160,10 +162,12 @@ func NewChip8() (c8 *chip8) {
 }
 
 func (c8 *chip8) cls() {
-	fmt.Print("\033[H\033[J")
-	c8.d.Clear()
 	//"\033[2J\033[H"
-	//display.clear()
+	//fmt.Print("\033[H\033[J")
+	for i := 0; i < 64*32; i++ {
+		vmem[i] = PixOff
+	}
+	c8.d.Clear()
 }
 
 func (c8 *chip8) drw(x, y, n uint8) {
@@ -183,7 +187,6 @@ func (c8 *chip8) drw(x, y, n uint8) {
 				vmem[uint32(x+uint8(dx))+uint32(y+uint8(dy))*64] = PixOn
 
 			} else {
-				//vmem[(x+uint8(i))*(y+uint8(n))] = PixOff
 				vmem[uint32(x+uint8(dx))+uint32(y+uint8(dy))*64] = PixOff
 				//fmt.Printf("\033[%d;%dH ", y+uint8(i), x+uint8(n))
 			}
@@ -207,6 +210,57 @@ func (c8 *chip8) Load(frimware string) error {
 	return nil
 }
 
+
+func (c8 *chip8) keyboard() {
+	var event sdl.Event
+	var running bool
+  kmap := map[sdl.Keycode]uint8 {
+	'1': 0x1,
+	'2': 0x2,
+	'3': 0x3,
+	'c': 0xc,
+
+	'4': 0x4,
+	'5': 0x5,
+	'6': 0x6,
+	'd': 0xd,
+
+	'7': 0x7,
+	'8': 0x8,
+	'9': 0x9,
+	'e': 0xe,
+
+	'a': 0xa,
+	'0': 0x0,
+	'b': 0xb,
+	'f': 0xf,
+ }
+
+	running = true
+	for running {
+		for event = sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
+			switch t := event.(type) {
+			case *sdl.QuitEvent:
+				running = false
+			case *sdl.KeyDownEvent:
+				if key, ok := kmap[t.Keysym.Sym]; ok {
+					//fmt.Printf("sym:%c\tstate:%d\n", t.Keysym.Sym, t.State)
+					c8.k[key] = t.State
+				}
+			case *sdl.KeyUpEvent:
+				if key, ok := kmap[t.Keysym.Sym]; ok {
+					//fmt.Printf("sym:%c\tstate:%d\n", t.Keysym.Sym, t.State)
+					c8.k[key] = t.State
+				}
+			}
+		}
+		sdl.Delay(16)
+	}
+
+
+}
+
+
 func (c8 *chip8) noop() {
 }
 
@@ -224,6 +278,7 @@ func (c8 *chip8) timer() {
 
 func (c8 *chip8) Run() {
 	go c8.timer()
+	go c8.keyboard()
 
 	for c8.c.r.pc < 0x1000 {
 		//time.Sleep(10 * time.Millisecond)
