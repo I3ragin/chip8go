@@ -13,6 +13,7 @@ import (
 )
 
 const PixOn, PixOff uint32 = 0x00EEEECC, 0
+
 //WTF?????
 var vmem [128 * 32]uint32
 
@@ -109,11 +110,11 @@ type cpu struct {
 
 //CHIP8  ...
 type chip8 struct {
-	c cpu
-	m memmory
-	s stack
-	k keyboard
-	d *Display
+	c    cpu
+	m    memmory
+	s    stack
+	k    keyboard
+	d    *Display
 	beep *mix.Music
 }
 
@@ -177,19 +178,19 @@ func (c8 *chip8) drw(x, y, n uint8) {
 
 			if ((bt >> (8 - dx)) & 0x01) > 0 {
 
-				index := (uint32(x+uint8(dx))+(uint32(y+uint8(dy))*64) )
-			//	fmt.Printf("y=%d,x=%d,z=%d\n",y+uint8(dy),x+uint8(dx),index)
-				if vmem[index]> 0 {
+				index := (uint32(x+uint8(dx)) + (uint32(y+uint8(dy)) * 64))
+				//	fmt.Printf("y=%d,x=%d,z=%d\n",y+uint8(dy),x+uint8(dx),index)
+				if vmem[index] > 0 {
 					c8.c.r.v[0xf] = 1
 					pixel = 1
-				}else {
+				} else {
 					pixel = 0
 				}
-				pixel ^=1
+				pixel ^= 1
 
 				if pixel > 0 {
 					vmem[index] = PixOn
-				}else{
+				} else {
 					vmem[index] = PixOff
 				}
 			}
@@ -275,7 +276,7 @@ func (c8 *chip8) timer() {
 		if c8.c.r.st > 0 {
 			c8.c.r.st--
 			//beep()
-			c8.beep.Play(1);
+			c8.beep.Play(1)
 			//fmt.Println("Beep")
 		}
 		if c8.c.r.dt > 0 {
@@ -825,5 +826,5 @@ func main() {
 	c8 := NewChip8()
 	c8.Load("./dump")
 	c8.Run()
-  fmt.Println("")
+	fmt.Println("")
 }
