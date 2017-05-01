@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/veandco/go-sdl2/sdl"
+	"github.com/veandco/go-sdl2/sdl_mixer"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -125,6 +126,7 @@ type chip8 struct {
 	s stack
 	k keyboard
 	d *Display
+	beep *mix.Music
 }
 
 func NewChip8() (c8 *chip8) {
@@ -156,6 +158,12 @@ func NewChip8() (c8 *chip8) {
 
 	c8.d, _ = NewDisplay()
 
+	if err := mix.OpenAudio(22050, mix.DEFAULT_FORMAT, 2, 4096); err != nil {
+		log.Println(err)
+		return
+	}
+	c8.beep, _ = mix.LoadMUS("./beep.wav")
+
 	return c8
 }
 
@@ -173,23 +181,37 @@ func (c8 *chip8) drw(x, y, n uint8) {
 	y = 2
 	n = 30
 	c8.c.r.i = 0*/
+	var pixel int
 	c8.c.r.v[0xf] = 0
+	fmt.Printf("!!!y=%d,x=%d\n",y,x)
 	for dy := uint16(0); dy < uint16(n); dy++ {
 
-		b := c8.m[c8.c.r.i+dy]
+		bt := c8.m[c8.c.r.i+dy]
 
 		for dx := uint(0); dx < 8; dx++ {
 
-			if ((b >> (8 - dx)) & 0x01) > 0 {
+			if ((bt >> (8 - dx)) & 0x01) > 0 {
 				//fmt.Printf("\033[%d;%dH#", y+uint8(dy), x+uint8(dx))
-				vmem[uint32(x+uint8(dx))+uint32(y+uint8(dy))*64] = PixOn
+				index := (uint32(x+uint8(dx))+(uint32(y+uint8(dy))*64) )
+				fmt.Printf("y=%d,x=%d,z=%d\n",y+uint8(dy),x+uint8(dx),index)
+				if vmem[index]> 0 {
+					c8.c.r.v[0xf] = 1
+					pixel = 1
+				}else {
+					pixel = 0
+				}
+				pixel ^=1
 
-			} else {
-				vmem[uint32(x+uint8(dx))+uint32(y+uint8(dy))*64] = PixOff
-				//fmt.Printf("\033[%d;%dH ", y+uint8(i), x+uint8(n))
+				if pixel > 0 {
+					vmem[index] = PixOn
+				}else{
+					vmem[index] = PixOff
+				}
+				//fmt.Printf("\033[%d;%dH ", y+uint8(i), x+uint8(n)
 			}
 		}
 	}
+	//fmt.Printf("x=%d,y=%d\n",x,y)
 	c8.d.Update(unsafe.Pointer(&vmem))
 
 }
@@ -260,15 +282,19 @@ func (c8 *chip8) noop() {
 }
 
 func (c8 *chip8) timer() {
-	if c8.c.r.st > 0 {
-		c8.c.r.st--
-		//beep()
+	for {
+		if c8.c.r.st > 0 {
+			c8.c.r.st--
+			//beep()
+			c8.beep.Play(1);
+			fmt.Println("Beep")
+		}
+		if c8.c.r.dt > 0 {
+			c8.c.r.dt--
+		}
+		//60Hz
+		time.Sleep(16666 * time.Microsecond)
 	}
-	if c8.c.r.dt > 0 {
-		c8.c.r.dt--
-	}
-	//60Hz
-	time.Sleep(16666 * time.Microsecond)
 }
 
 func (c8 *chip8) Run() {
@@ -276,7 +302,7 @@ func (c8 *chip8) Run() {
 	go c8.keyboard()
 
 	for c8.c.r.pc < 0x1000 {
-		time.Sleep(12000 * time.Microsecond)
+		time.Sleep(1000 * time.Microsecond)
 		cmd := uint16(c8.m[c8.c.r.pc+1]) | uint16(c8.m[c8.c.r.pc])<<8
 		switch cmd & 0xF000 {
 		case 0x0000:
@@ -424,9 +450,12 @@ func (c8 *chip8) Run() {
 				Set Vx = Vx + kk.
 				Adds the value kk to the value of register Vx, then stores the result in Vx.
 			*/
+
 			x := uint8(cmd & 0x0F00 >> 8)
 			kk := uint8(cmd & 0x00FF)
+			fmt.Printf("V%1X = %X\n", x, c8.c.r.v[x])
 			c8.c.r.v[x] += kk
+			fmt.Printf("V%1X = %X\n", x, c8.c.r.v[x])
 			c8.c.r.pc += 2
 		case 0x8000:
 			switch cmd & 0x000F {
@@ -629,7 +658,7 @@ func (c8 *chip8) Run() {
 				y := uint8((cmd & 0x00F0) >> 4)
 				n := uint8(cmd & 0x000F)
 
-				c8.drw(x, y, n)
+				c8.drw(c8.c.r.v[x], c8.c.r.v[y], n)
 				c8.c.r.pc += 2
 			}
 
