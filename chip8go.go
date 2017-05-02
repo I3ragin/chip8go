@@ -2,14 +2,15 @@ package main
 
 import (
 	"fmt"
-	"github.com/veandco/go-sdl2/sdl"
-	"github.com/veandco/go-sdl2/sdl_mixer"
 	"io/ioutil"
 	"log"
 	"math/rand"
-
+	"os"
 	"time"
 	"unsafe"
+
+	"github.com/veandco/go-sdl2/sdl"
+	"github.com/veandco/go-sdl2/sdl_mixer"
 )
 
 const PixOn, PixOff uint32 = 0x00EEEECC, 0
@@ -251,6 +252,7 @@ func (c8 *chip8) keyboard() {
 			switch t := event.(type) {
 			case *sdl.QuitEvent:
 				running = false
+				os.Exit(0)
 			case *sdl.KeyDownEvent:
 				if key, ok := kmap[t.Keysym.Sym]; ok {
 					////fmt.Printf("sym:%c\tstate:%d\n", t.Keysym.Sym, t.State)
