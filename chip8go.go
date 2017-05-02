@@ -292,7 +292,7 @@ func (c8 *chip8) Run() {
 	go c8.keyboard()
 
 	for c8.c.r.pc < 0x1000 {
-		time.Sleep(1500 * time.Microsecond)
+		time.Sleep(1200 * time.Microsecond)
 		cmd := uint16(c8.m[c8.c.r.pc+1]) | uint16(c8.m[c8.c.r.pc])<<8
 		switch cmd & 0xF000 {
 		case 0x0000:
